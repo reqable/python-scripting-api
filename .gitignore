@@ -1,0 +1,6 @@
+.DS_STORE
+/build
+/dist
+/reqable_scripting.egg-info
+__pycache__
+*.cb
