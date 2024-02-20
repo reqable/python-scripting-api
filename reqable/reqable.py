@@ -181,7 +181,7 @@ class CaptureHttpQueries:
     if encode:
       from urllib.parse import urlencode, quote
       # Keep asterish to be safe
-      return urlencode(self._entries, safe='*', quote_via=quote)
+      return urlencode(self._entries, safe='*=')
     else:
       return '&'.join(['='.join(entry) for entry in self._entries])
 
