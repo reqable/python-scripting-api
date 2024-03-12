@@ -633,7 +633,7 @@ class CaptureHttpRequest:
     self._body = CaptureHttpBody.parse(json.get('body'))
     self._trailers = CaptureHttpHeaders(json.get('trailers'))
     from urllib.parse import urlparse
-    url = urlparse(json['path'])
+    url = urlparse('https://reqable.com' + json['path'])
     self._path = url.path
     self._queries = CaptureHttpQueries.parse(url.query)
 
