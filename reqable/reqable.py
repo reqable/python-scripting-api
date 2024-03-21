@@ -15,6 +15,7 @@ class CaptureContext:
     self._sid = json['sid']
     self._stime = json['stime']
     self.shared = json.get('shared')
+    self.env = json.get('env')
 
   def __str__(self):
     return self.toJson()
@@ -81,6 +82,7 @@ class CaptureContext:
       'sid': self._sid,
       'stime': self._stime,
       'shared': self.shared,
+      'env': self.env,
     })
 
 class CaptureHttpQueries:
