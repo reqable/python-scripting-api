@@ -189,8 +189,19 @@ class CaptureHttpQueries:
 
   # Get all query paramaters.
   @property
-  def entries(self) -> List[Tuple[str, str]]:
+  def entries(self) -> List[str]:
     return self._entries
+
+  # Convert the query paramaters to a dict.
+  def toDict(self) -> Dict[str, str]:
+    map = {}
+    for entry in self.entries:
+      map[entry[0]] = entry[1]
+    return map
+
+  # Convert the query paramaters to a json str.
+  def toJson(self) -> str:
+    return json.dumps(self.toDict())
 
   def serialize(self) -> str:
     return self.concat()
@@ -284,6 +295,18 @@ class CaptureHttpHeaders:
   @property
   def entries(self) -> List[str]:
     return self._entries
+
+  # Convert the headers to a dict.
+  def toDict(self) -> Dict[str, str]:
+    map = {}
+    for entry in self.entries:
+      name, value = entry.split(': ')
+      map[name] = value
+    return map
+
+  # Convert the headers to a json str.
+  def toJson(self) -> str:
+    return json.dumps(self.toDict())
 
   def serialize(self) -> List[str]:
     return self._entries

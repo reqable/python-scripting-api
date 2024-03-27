@@ -175,5 +175,17 @@ class HttpHeadersTest(unittest.TestCase):
     self.assertEqual(headers['abc'], '123')
     self.assertEqual(headers['hello'], 'WORLD')
 
+  def testHttpHeadersDict(self):
+    headers = CaptureHttpHeaders([
+      'foo: bar',
+      'abc: 123',
+      'hello: world',
+      'hello: '
+    ])
+    d = headers.toDict()
+    self.assertEqual(d['foo'], 'bar')
+    self.assertEqual(d['abc'], '123')
+    self.assertEqual(d['hello'], '')
+
 if __name__ == '__main__':
   unittest.main()

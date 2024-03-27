@@ -137,5 +137,12 @@ class HttpQueriesTest(unittest.TestCase):
     self.assertEqual(queries.concat(encode=True), 'foo=bar&abc=123&url=https%3A%2F%2Freqable.com')
     self.assertEqual(queries.concat(encode=False), 'foo=bar&abc=123&url=https://reqable.com')
 
+  def testHttpQueriesDict(self):
+    queries = CaptureHttpQueries.parse('foo=bar&abc=123&hello=world&hello=')
+    d = queries.toDict()
+    self.assertEqual(d['foo'], 'bar')
+    self.assertEqual(d['abc'], '123')
+    self.assertEqual(d['hello'], '')
+
 if __name__ == '__main__':
   unittest.main()
