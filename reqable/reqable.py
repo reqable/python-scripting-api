@@ -14,8 +14,8 @@ class CaptureContext:
     self._ctime = json['ctime']
     self._sid = json['sid']
     self._stime = json['stime']
+    self._env = json.get('env')
     self.shared = json.get('shared')
-    self.env = json.get('env')
 
   def __str__(self):
     return self.toJson()
@@ -71,6 +71,11 @@ class CaptureContext:
   def uid(self) -> str:
     return f"{self.ctime}-{self.cid}-{self.sid}"
 
+  # Environment variables.
+  @property
+  def env(self) -> Dict[str, str]:
+    return self._env
+
   def toJson(self) -> str:
     return json.dumps({
       'url': self._url,
@@ -81,8 +86,8 @@ class CaptureContext:
       'ctime': self._ctime,
       'sid': self._sid,
       'stime': self._stime,
+      'env': self._env,
       'shared': self.shared,
-      'env': self.env,
     })
 
 class CaptureHttpQueries:

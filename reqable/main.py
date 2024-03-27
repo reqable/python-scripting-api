@@ -24,6 +24,7 @@ def onRequest(request):
       with open(request + '.cb', 'w', encoding='UTF-8') as callback:
         callback.write(json.dumps({
           'request': result.serialize(),
+          'env': context.env,
           'shared': context.shared,
         }))
 
@@ -36,6 +37,7 @@ def onResponse(response):
       with open(response + '.cb', 'w', encoding='UTF-8') as callback:
         callback.write(json.dumps({
           'response': result.serialize(),
+          'env': context.env,
           'shared': context.shared,
         }))
 
