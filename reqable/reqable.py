@@ -4,6 +4,37 @@ import os
 from email.message import EmailMessage
 from typing import Union, List, Tuple, Dict
 
+class CaptureApp:
+  def __init__(self, json: dict):
+    self._name = json['name']
+    self._id = json.get('id')
+    self._path = json.get('path')
+
+  # The app's name.
+  @property
+  def name(self) -> str:
+    return self._name
+
+  # The app unique id, such as `bundleId`, `packageName`.
+  # return None if not detected.
+  @property
+  def id(self) -> Union[str, None]:
+    return self._id
+
+  # The app installed path.
+  # return None if not detected.
+  @property
+  def path(self) -> Union[str, None]:
+    return self._path
+
+  # Serialize the app info to a dict.
+  def serialize(self) -> dict:
+    return {
+      'name': self._name,
+      'id': self._id,
+      'path': self._path,
+    }
+
 class CaptureContext:
   def __init__(self, json: dict):
     self._url = json['url']
@@ -15,6 +46,11 @@ class CaptureContext:
     self._sid = json['sid']
     self._stime = json['stime']
     self._env = json.get('env')
+    app = json.get('app')
+    if app is None:
+      self._app = None
+    else:
+      self._app = CaptureApp(app)
     self.shared = json.get('shared')
 
   def __str__(self):
@@ -76,6 +112,11 @@ class CaptureContext:
   def env(self) -> Dict[str, str]:
     return self._env
 
+  # App info, return None means unknown app.
+  @property
+  def app(self) -> Union[CaptureApp, None]:
+    return self._app
+
   def toJson(self) -> str:
     return json.dumps({
       'url': self._url,
@@ -87,6 +128,7 @@ class CaptureContext:
       'sid': self._sid,
       'stime': self._stime,
       'env': self._env,
+      'app': self._app.serialize(),
       'shared': self.shared,
     })
 
