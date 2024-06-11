@@ -134,11 +134,13 @@ class CaptureContext:
 
 class CaptureHttpQueries:
 
-  def __init__(self, entries = None):
+  def __init__(self, entries = None, origin = None):
     if entries is None:
       self._entries = []
     else:
       self._entries = entries
+    self.origin = origin
+    self.mod = 0
 
   @classmethod
   def parse(cls, query: str):
@@ -147,7 +149,7 @@ class CaptureHttpQueries:
     else:
       from urllib.parse import parse_qsl
       entries = parse_qsl(query, keep_blank_values = True)
-    return cls(entries)
+    return cls(entries, query)
 
   @classmethod
   def of(cls, data):
@@ -194,17 +196,20 @@ class CaptureHttpQueries:
         self._entries[index] = (name, value)
       else:
         self._entries.append((name, value))
+      self.mod += 1
 
   # Add a query paramater with name and value.
   def add(self, name: str, value: str):
     if not name:
       return
     self._entries.append((name, value))
+    self.mod += 1
 
   # Remove query paramaters by name, all the matched query paramaters will be removed.
   def remove(self, name: str):
     for index in reversed(self.indexes(name)):
       self._entries.pop(index)
+      self.mod += 1
 
   # Find the first query paramater index by name. If no matched, returns -1.
   def index(self, name: str) -> int:
@@ -224,11 +229,12 @@ class CaptureHttpQueries:
   # Remove all query paramaters.
   def clear(self):
     self._entries.clear()
+    self.mod += 1
 
   # Concat all the query paramaters to a query string.
   def concat(self, encode: bool = True) -> str:
     if encode:
-      from urllib.parse import urlencode, quote
+      from urllib.parse import urlencode
       # Keep asterish to be safe
       return urlencode(self._entries, safe='*=')
     else:
@@ -251,7 +257,7 @@ class CaptureHttpQueries:
     return json.dumps(self.toDict())
 
   def serialize(self) -> str:
-    return self.concat()
+    return self.origin if self.mod == 0 else self.concat()
 
 class CaptureHttpHeaders:
 
