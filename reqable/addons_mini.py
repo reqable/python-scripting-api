@@ -1,9 +1,9 @@
 # API Docs: https://reqable.com/docs/capture/addons
 
-from reqable import *
+from reqable.reqable import CaptureContext, CaptureHttpRequest, CaptureHttpResponse
 
-def onRequest(context, request):
+def onRequest(context: CaptureContext, request: CaptureHttpRequest) -> CaptureHttpRequest:
   return request
 
-def onResponse(context, response):
+def onResponse(context: CaptureContext, response: CaptureHttpResponse) -> CaptureHttpResponse:
   return response

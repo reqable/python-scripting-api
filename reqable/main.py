@@ -1,7 +1,7 @@
 import sys
 import json
-from reqable import CaptureContext, CaptureHttpRequest, CaptureHttpResponse
-import addons
+from reqable.reqable import CaptureContext, CaptureHttpRequest, CaptureHttpResponse
+from reqable import addons
 
 def main():
   argv = sys.argv[1:]

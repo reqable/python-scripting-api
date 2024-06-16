@@ -1,8 +1,8 @@
 # API Docs: https://reqable.com/docs/capture/addons
 
-from reqable import *
+from reqable.reqable import CaptureContext, CaptureHttpRequest, CaptureHttpResponse
 
-def onRequest(context, request):
+def onRequest(context: CaptureContext, request: CaptureHttpRequest) -> CaptureHttpRequest:
   # Print url to console
   # print('request url ' + context.url)
 
@@ -26,7 +26,7 @@ def onRequest(context, request):
   # Done
   return request
 
-def onResponse(context, response):
+def onResponse(context: CaptureContext, response: CaptureHttpResponse) -> CaptureHttpResponse:
   # Update status code
   # response.code = 404
 
