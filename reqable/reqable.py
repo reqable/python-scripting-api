@@ -712,6 +712,7 @@ class CaptureHttpRequest:
     self._trailers = CaptureHttpHeaders(json.get('trailers'))
     from urllib.parse import urlparse
     url = urlparse('https://reqable.com' + json['path'])
+    self._params = url.params
     self._path = url.path
     self._queries = CaptureHttpQueries.parse(url.query)
 
@@ -812,10 +813,11 @@ class CaptureHttpRequest:
 
   # Serialize the request fields to a dict.
   def serialize(self) -> dict:
-    if len(self.queries) == 0:
-      path = self.path
-    else:
-      path = self.path + '?' + self.queries.serialize()
+    path = self.path
+    if self._params != None and self._params != '':
+      path = path + ';' + self._params
+    if len(self.queries) != 0:
+      path = path + '?' + self.queries.serialize()
     return {
       'method': self.method,
       'path': path,
