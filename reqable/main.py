@@ -25,6 +25,7 @@ def onRequest(request):
         callback.write(json.dumps({
           'request': result.serialize(),
           'env': context.env,
+          'highlight': context.highlight,
           'shared': context.shared,
         }))
 
@@ -38,6 +39,7 @@ def onResponse(response):
         callback.write(json.dumps({
           'response': result.serialize(),
           'env': context.env,
+          'highlight': context.highlight,
           'shared': context.shared,
         }))
 
