@@ -26,6 +26,7 @@ def onRequest(request):
           'request': result.serialize(),
           'env': context.env,
           'highlight': context.highlight,
+          'comment': context.comment,
           'shared': context.shared,
         }))
 
@@ -40,6 +41,7 @@ def onResponse(response):
           'response': result.serialize(),
           'env': context.env,
           'highlight': context.highlight,
+          'comment': context.comment,
           'shared': context.shared,
         }))
 

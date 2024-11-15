@@ -56,6 +56,7 @@ class Context:
     self._sid = json['sid']
     self._stime = json['stime']
     self._env = json.get('env')
+    self._comment = json.get('comment')
     app = json.get('app')
     if app is None:
       self._app = None
@@ -137,6 +138,16 @@ class Context:
   def highlight(self, highlight: Highlight):
     self._highlight = highlight.value
 
+  # Get the comment.
+  @property
+  def comment(self) -> Union[None, int]:
+    return self._comment
+
+  # Set the comment.
+  @comment.setter
+  def comment(self, comment: str):
+    self._comment = comment
+
   def toJson(self) -> str:
     return json.dumps({
       'url': self._url,
@@ -151,6 +162,7 @@ class Context:
       'app': self._app.serialize(),
       'shared': self.shared,
       'highlight': self._highlight,
+      'comment': self._comment,
     })
 
 class HttpQueries:
