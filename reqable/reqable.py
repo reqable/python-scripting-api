@@ -404,9 +404,10 @@ class HttpBody:
   __type_binary = 2
   __type_multipart = 3
 
-  def __init__(self, type: int = 0, payload = None):
+  def __init__(self, type: int = 0, payload = None, charset = None):
     self._type = type
     self._payload = payload
+    self._charset = charset
 
   @classmethod
   def of(cls, data = None):
@@ -424,7 +425,7 @@ class HttpBody:
     else:
       type = cls.__type_none
       payload = None
-    return cls(type, payload)
+    return cls(type, payload, 'utf-8')
 
   @classmethod
   def parse(cls, dict):
@@ -433,10 +434,13 @@ class HttpBody:
     type = dict['type']
     if type == cls.__type_none:
       payload = None
+      charset = None
     elif type == cls.__type_text:
-      payload = dict['payload']
+      payload = dict['payload']['text']
+      charset = dict['payload']['charset']
     elif type == cls.__type_binary:
       payload = dict['payload']
+      charset = None
       if isinstance(payload, str):
         with open(payload, mode = 'rb') as file:
           payload = file.read()
@@ -446,9 +450,10 @@ class HttpBody:
         payload = bytes()
     elif type == cls.__type_multipart:
       payload = []
+      charset = None
       for multipart in dict['payload']:
         payload.append(HttpMultipartBody(multipart))
-    return cls(type, payload)
+    return cls(type, payload, charset)
 
   def __repr__(self):
     if self.isMultipart:
@@ -611,9 +616,15 @@ class HttpBody:
           payload = None
           type = HttpBody.__type_none
         else:
-          payload = self._payload
+          payload = {
+            'text': self._payload,
+            'charset': self._charset
+          }
       else:
-        payload = json.dumps(self._payload)
+        payload = {
+          'text': json.dumps(self._payload),
+          'charset': self._charset
+        }
     elif self.isBinary:
       if len(self._payload) == 0:
         type = HttpBody.__type_none
