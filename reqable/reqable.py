@@ -425,7 +425,7 @@ class HttpBody:
     else:
       type = cls.__type_none
       payload = None
-    return cls(type, payload, 'utf-8')
+    return cls(type, payload, 'UTF-8')
 
   @classmethod
   def parse(cls, dict):
@@ -663,7 +663,7 @@ class HttpMultipartBody(HttpBody):
     return None
 
   @classmethod
-  def text(cls, text: str, name: str = '', filename: str = '', headers = None, type = 'form-data'):
+  def text(cls, text: str, name: str = '', filename: str = '', headers = None, type = 'form-data', charset= 'UTF-8'):
     if headers is None:
       headers = []
     headers.append(f'content-length: {len(text)}')
@@ -674,7 +674,10 @@ class HttpMultipartBody(HttpBody):
       'headers': headers,
       'body': {
         'type': 1,
-        'payload': text
+        'payload': {
+          'text': text,
+          'charset': charset
+        }
       }
     })
 
