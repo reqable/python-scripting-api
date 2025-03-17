@@ -1,4 +1,10 @@
 import sys
+import os
+
+pwd = os.path.dirname(os.path.abspath(__file__))
+if pwd not in sys.path:
+  sys.path.append(pwd)
+
 import json
 from reqable import CaptureContext, CaptureHttpRequest, CaptureHttpResponse
 import addons
