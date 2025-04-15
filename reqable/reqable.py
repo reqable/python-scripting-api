@@ -585,11 +585,17 @@ class HttpBody:
       return self._payload[name]
     return None
 
-  # Set the json dict value by name. Note: you must call jsonify() before this.
-  def __setitem__(self, name: str, value):
+  # If the body type is a json dict, set the value. Note: you must call jsonify() before this.
+  # If the body type is binary, set the value at the index.
+  # If the body type is multipart, set the part at the index.
+  def __setitem__(self, name: Union[str, int], value):
     if self.isText:
       if not isinstance(self._payload, dict):
         raise Exception('Did you forget to call `jsonify()` before operating json dict?')
+      self._payload[name] = value
+    if self.isBinary and isinstance(name, int):
+      self._payload[name] = value
+    if self.isMultipart and isinstance(name, int):
       self._payload[name] = value
 
   # Write the body content to a file.
