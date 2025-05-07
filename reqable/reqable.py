@@ -2,9 +2,50 @@ import json
 import uuid
 import os
 from email.message import EmailMessage
+from enum import Enum
 from typing import Union, List, Tuple, Dict
 
-class CaptureContext:
+class App:
+  def __init__(self, json: dict):
+    self._name = json['name']
+    self._id = json.get('id')
+    self._path = json.get('path')
+
+  # The app's name.
+  @property
+  def name(self) -> str:
+    return self._name
+
+  # The app unique id, such as `bundleId`, `packageName`.
+  # return None if not detected.
+  @property
+  def id(self) -> Union[str, None]:
+    return self._id
+
+  # The app installed path.
+  # return None if not detected.
+  @property
+  def path(self) -> Union[str, None]:
+    return self._path
+
+  # Serialize the app info to a dict.
+  def serialize(self) -> dict:
+    return {
+      'name': self._name,
+      'id': self._id,
+      'path': self._path,
+    }
+
+class Highlight(Enum):
+  none = 0
+  red = 1
+  yellow = 2
+  green = 3
+  blue = 4
+  teal = 5
+  strikethrough = 6
+
+class Context:
   def __init__(self, json: dict):
     self._url = json['url']
     self._scheme = json['scheme']
@@ -15,6 +56,13 @@ class CaptureContext:
     self._sid = json['sid']
     self._stime = json['stime']
     self._env = json.get('env')
+    self._comment = json.get('comment')
+    app = json.get('app')
+    if app is None:
+      self._app = None
+    else:
+      self._app = App(app)
+    self._highlight = None
     self.shared = json.get('shared')
 
   def __str__(self):
@@ -76,6 +124,30 @@ class CaptureContext:
   def env(self) -> Dict[str, str]:
     return self._env
 
+  # App info, return None means unknown app.
+  @property
+  def app(self) -> Union[App, None]:
+    return self._app
+
+  @property
+  def highlight(self) -> Union[None, int]:
+    return self._highlight
+
+  # Set the highlight color.
+  @highlight.setter
+  def highlight(self, highlight: Highlight):
+    self._highlight = highlight.value
+
+  # Get the comment.
+  @property
+  def comment(self) -> Union[None, int]:
+    return self._comment
+
+  # Set the comment.
+  @comment.setter
+  def comment(self, comment: str):
+    self._comment = comment
+
   def toJson(self) -> str:
     return json.dumps({
       'url': self._url,
@@ -87,16 +159,21 @@ class CaptureContext:
       'sid': self._sid,
       'stime': self._stime,
       'env': self._env,
+      'app': self._app.serialize(),
       'shared': self.shared,
+      'highlight': self._highlight,
+      'comment': self._comment,
     })
 
-class CaptureHttpQueries:
+class HttpQueries:
 
-  def __init__(self, entries = None):
+  def __init__(self, entries = None, origin = None):
     if entries is None:
       self._entries = []
     else:
       self._entries = entries
+    self.origin = origin
+    self.mod = 0
 
   @classmethod
   def parse(cls, query: str):
@@ -105,7 +182,7 @@ class CaptureHttpQueries:
     else:
       from urllib.parse import parse_qsl
       entries = parse_qsl(query, keep_blank_values = True)
-    return cls(entries)
+    return cls(entries, query)
 
   @classmethod
   def of(cls, data):
@@ -152,17 +229,20 @@ class CaptureHttpQueries:
         self._entries[index] = (name, value)
       else:
         self._entries.append((name, value))
+      self.mod += 1
 
   # Add a query paramater with name and value.
   def add(self, name: str, value: str):
     if not name:
       return
     self._entries.append((name, value))
+    self.mod += 1
 
   # Remove query paramaters by name, all the matched query paramaters will be removed.
   def remove(self, name: str):
     for index in reversed(self.indexes(name)):
       self._entries.pop(index)
+      self.mod += 1
 
   # Find the first query paramater index by name. If no matched, returns -1.
   def index(self, name: str) -> int:
@@ -182,11 +262,12 @@ class CaptureHttpQueries:
   # Remove all query paramaters.
   def clear(self):
     self._entries.clear()
+    self.mod += 1
 
   # Concat all the query paramaters to a query string.
   def concat(self, encode: bool = True) -> str:
     if encode:
-      from urllib.parse import urlencode, quote
+      from urllib.parse import urlencode
       # Keep asterish to be safe
       return urlencode(self._entries, safe='*=')
     else:
@@ -209,9 +290,9 @@ class CaptureHttpQueries:
     return json.dumps(self.toDict())
 
   def serialize(self) -> str:
-    return self.concat()
+    return self.origin if self.mod == 0 else self.concat()
 
-class CaptureHttpHeaders:
+class HttpHeaders:
 
   def __init__(self, entries = None):
     self._entries = ([] if entries is None else entries)
@@ -316,16 +397,17 @@ class CaptureHttpHeaders:
   def serialize(self) -> List[str]:
     return self._entries
 
-class CaptureHttpBody:
+class HttpBody:
 
   __type_none = 0
   __type_text = 1
   __type_binary = 2
   __type_multipart = 3
 
-  def __init__(self, type: int = 0, payload = None):
+  def __init__(self, type: int = 0, payload = None, charset = None):
     self._type = type
     self._payload = payload
+    self._charset = charset
 
   @classmethod
   def of(cls, data = None):
@@ -338,12 +420,12 @@ class CaptureHttpBody:
     elif isinstance(data, bytes):
       type = cls.__type_binary
       payload = data
-    elif isinstance(data, CaptureHttpBody):
+    elif isinstance(data, HttpBody):
       return data
     else:
       type = cls.__type_none
       payload = None
-    return cls(type, payload)
+    return cls(type, payload, 'UTF-8')
 
   @classmethod
   def parse(cls, dict):
@@ -352,10 +434,13 @@ class CaptureHttpBody:
     type = dict['type']
     if type == cls.__type_none:
       payload = None
+      charset = None
     elif type == cls.__type_text:
-      payload = dict['payload']
+      payload = dict['payload']['text']
+      charset = dict['payload']['charset']
     elif type == cls.__type_binary:
       payload = dict['payload']
+      charset = None
       if isinstance(payload, str):
         with open(payload, mode = 'rb') as file:
           payload = file.read()
@@ -365,9 +450,10 @@ class CaptureHttpBody:
         payload = bytes()
     elif type == cls.__type_multipart:
       payload = []
+      charset = None
       for multipart in dict['payload']:
-        payload.append(CaptureHttpMultipartBody(multipart))
-    return cls(type, payload)
+        payload.append(HttpMultipartBody(multipart))
+    return cls(type, payload, charset)
 
   def __repr__(self):
     if self.isMultipart:
@@ -414,38 +500,38 @@ class CaptureHttpBody:
   # Determine whether the body is None.
   @property
   def isNone(self) -> bool:
-    return self._type is CaptureHttpBody.__type_none
+    return self._type is HttpBody.__type_none
 
   # Determine whether the body is a text string.
   @property
   def isText(self) -> bool:
-    return self._type is CaptureHttpBody.__type_text
+    return self._type is HttpBody.__type_text
 
   # Determine whether the body is a binary bytes.
   @property
   def isBinary(self) -> bool:
-    return self._type is CaptureHttpBody.__type_binary
+    return self._type is HttpBody.__type_binary
 
   # Determine whether the body is a multipart type.
   @property
   def isMultipart(self) -> bool:
-    return self._type is CaptureHttpBody.__type_multipart
+    return self._type is HttpBody.__type_multipart
 
   # Set the body to None.
   def none(self):
-    self._type = CaptureHttpBody.__type_none
+    self._type = HttpBody.__type_none
     self._payload = None
 
   # Set the body to a text string.
   def text(self, value: str):
-    self._type = CaptureHttpBody.__type_text
+    self._type = HttpBody.__type_text
     self._payload = value
 
   # Set the body to a specified file content, the file content must be a text string.
   def textFromFile(self, value: str):
     with open(value, mode = 'r', encoding='UTF-8') as file:
       self._payload = file.read()
-    self._type = CaptureHttpBody.__type_text
+    self._type = HttpBody.__type_text
 
   # Set the body to the specified file content, the file content must be a binary bytes.
   def file(self, value: str):
@@ -455,11 +541,11 @@ class CaptureHttpBody:
   # Set the body to binary bytes.
   def binary(self, value: Union[str, bytes]):
     if isinstance(value, str):
-      self._type = CaptureHttpBody.__type_binary
+      self._type = HttpBody.__type_binary
       with open(value, mode = 'rb') as file:
         self._payload = file.read()
     if isinstance(value, bytes):
-      self._type = CaptureHttpBody.__type_binary
+      self._type = HttpBody.__type_binary
       self._payload = value
 
   # Set the body to binary bytes.
@@ -468,11 +554,11 @@ class CaptureHttpBody:
       return
     payload = []
     for multipart in value:
-      if isinstance(multipart, CaptureHttpMultipartBody):
+      if isinstance(multipart, HttpMultipartBody):
         payload.append(multipart)
     if len(payload) == 0:
       return
-    self._type = CaptureHttpBody.__type_multipart
+    self._type = HttpBody.__type_multipart
     self._payload = payload
 
   # Convert the body content to a json dict.
@@ -499,11 +585,17 @@ class CaptureHttpBody:
       return self._payload[name]
     return None
 
-  # Set the json dict value by name. Note: you must call jsonify() before this.
-  def __setitem__(self, name: str, value):
+  # If the body type is a json dict, set the value. Note: you must call jsonify() before this.
+  # If the body type is binary, set the value at the index.
+  # If the body type is multipart, set the part at the index.
+  def __setitem__(self, name: Union[str, int], value):
     if self.isText:
       if not isinstance(self._payload, dict):
         raise Exception('Did you forget to call `jsonify()` before operating json dict?')
+      self._payload[name] = value
+    if self.isBinary and isinstance(name, int):
+      self._payload[name] = value
+    if self.isMultipart and isinstance(name, int):
       self._payload[name] = value
 
   # Write the body content to a file.
@@ -528,14 +620,20 @@ class CaptureHttpBody:
       if isinstance(self._payload, str):
         if len(self._payload) == 0:
           payload = None
-          type = CaptureHttpBody.__type_none
+          type = HttpBody.__type_none
         else:
-          payload = self._payload
+          payload = {
+            'text': self._payload,
+            'charset': self._charset
+          }
       else:
-        payload = json.dumps(self._payload)
+        payload = {
+          'text': json.dumps(self._payload),
+          'charset': self._charset
+        }
     elif self.isBinary:
       if len(self._payload) == 0:
-        type = CaptureHttpBody.__type_none
+        type = HttpBody.__type_none
         payload = None
       else:
         payload = os.path.join(os.getcwd(), 'tmp-' + str(uuid.uuid4()))
@@ -543,7 +641,7 @@ class CaptureHttpBody:
           file.write(self._payload)
     elif self.isMultipart:
       if len(self._payload) == 0:
-        type = CaptureHttpBody.__type_none
+        type = HttpBody.__type_none
         payload = None
       else:
         payload = []
@@ -554,11 +652,11 @@ class CaptureHttpBody:
       'payload': payload,
     }
 
-class CaptureHttpMultipartBody(CaptureHttpBody):
+class HttpMultipartBody(HttpBody):
 
   def __init__(self, json: dict):
-    self._headers = CaptureHttpHeaders(json['headers'])
-    body = CaptureHttpBody.parse(json['body'])
+    self._headers = HttpHeaders(json['headers'])
+    body = HttpBody.parse(json['body'])
     super().__init__(body.type, body.payload)
 
   def _concatDisposition(name: str, filename: str, type: str):
@@ -571,18 +669,21 @@ class CaptureHttpMultipartBody(CaptureHttpBody):
     return None
 
   @classmethod
-  def text(cls, text: str, name: str = '', filename: str = '', headers = None, type = 'form-data'):
+  def text(cls, text: str, name: str = '', filename: str = '', headers = None, type = 'form-data', charset= 'UTF-8'):
     if headers is None:
       headers = []
     headers.append(f'content-length: {len(text)}')
-    disposition = CaptureHttpMultipartBody._concatDisposition(name, filename, type)
+    disposition = HttpMultipartBody._concatDisposition(name, filename, type)
     if disposition is not None:
       headers.append(f'content-disposition: {disposition}')
     return cls({
       'headers': headers,
       'body': {
         'type': 1,
-        'payload': text
+        'payload': {
+          'text': text,
+          'charset': charset
+        }
       }
     })
 
@@ -591,7 +692,7 @@ class CaptureHttpMultipartBody(CaptureHttpBody):
     if headers is None:
       headers = []
     headers.append(f'content-length: {os.stat(file).st_size}')
-    disposition = CaptureHttpMultipartBody._concatDisposition(name, filename, type)
+    disposition = HttpMultipartBody._concatDisposition(name, filename, type)
     if disposition is not None:
       headers.append(f'content-disposition: {disposition}')
     return cls({
@@ -604,13 +705,13 @@ class CaptureHttpMultipartBody(CaptureHttpBody):
 
   # Get the part headers.
   @property
-  def headers(self) -> CaptureHttpHeaders:
+  def headers(self) -> HttpHeaders:
     return self._headers
 
   # Set the part headers.
   @headers.setter
   def headers(self, data: Union[List[str], List[Tuple[str, str]], Dict[str, str]]):
-    self._headers = CaptureHttpHeaders.of(data)
+    self._headers = HttpHeaders.of(data)
 
   # Get the part name.
   @property
@@ -655,17 +756,18 @@ class CaptureHttpMultipartBody(CaptureHttpBody):
     message.set_param(param, value, header='content-disposition')
     self._headers['content-disposition'] = message.get('content-disposition')
 
-class CaptureHttpRequest:
+class HttpRequest:
   def __init__(self, json):
     self._method = json['method']
     self._protocol = json['protocol']
-    self._headers = CaptureHttpHeaders(json.get('headers'))
-    self._body = CaptureHttpBody.parse(json.get('body'))
-    self._trailers = CaptureHttpHeaders(json.get('trailers'))
+    self._headers = HttpHeaders(json.get('headers'))
+    self._body = HttpBody.parse(json.get('body'))
+    self._trailers = HttpHeaders(json.get('trailers'))
     from urllib.parse import urlparse
     url = urlparse('https://reqable.com' + json['path'])
+    self._params = url.params
     self._path = url.path
-    self._queries = CaptureHttpQueries.parse(url.query)
+    self._queries = HttpQueries.parse(url.query)
 
   def __str__(self):
     return self.toJson()
@@ -709,43 +811,43 @@ class CaptureHttpRequest:
 
   # Get the request query paramaters.
   @property
-  def queries(self) -> CaptureHttpQueries:
+  def queries(self) -> HttpQueries:
     return self._queries
 
   # Set the request query paramaters.
   @queries.setter
   def queries(self, data: Union[str, List[Tuple[str, str]], Dict[str, str]]):
-    self._queries = CaptureHttpQueries.of(data)
+    self._queries = HttpQueries.of(data)
 
   # Get the request headers.
   @property
-  def headers(self) -> CaptureHttpHeaders:
+  def headers(self) -> HttpHeaders:
     return self._headers
 
   # Set the request headers.
   @headers.setter
   def headers(self, data: Union[List[str], List[Tuple[str, str]], Dict[str, str]]):
-    self._headers = CaptureHttpHeaders.of(data)
+    self._headers = HttpHeaders.of(data)
 
   # Get the request trailers. Note that the implementation of this function is incomplete, please do not use it.
   @property
-  def trailers(self) -> CaptureHttpHeaders:
+  def trailers(self) -> HttpHeaders:
     return self._trailers
 
   # Set the request trailers. Note that the implementation of this function is incomplete, please do not use it.
   @trailers.setter
   def trailers(self, data: Union[List[str], List[Tuple[str, str]], Dict[str, str]]):
-    self._trailers = CaptureHttpHeaders.of(data)
+    self._trailers = HttpHeaders.of(data)
 
   # Get the request body.
   @property
-  def body(self) -> CaptureHttpBody:
+  def body(self) -> HttpBody:
     return self._body
 
   # Set the request body.
   @body.setter
-  def body(self, data: Union[str, bytes, dict, CaptureHttpBody]):
-    self._body = CaptureHttpBody.of(data)
+  def body(self, data: Union[str, bytes, dict, HttpBody]):
+    self._body = HttpBody.of(data)
 
   # Get the request content type from headers.
   @property
@@ -764,10 +866,11 @@ class CaptureHttpRequest:
 
   # Serialize the request fields to a dict.
   def serialize(self) -> dict:
-    if len(self.queries) == 0:
-      path = self.path
-    else:
-      path = self.path + '?' + self.queries.serialize()
+    path = self.path
+    if self._params != None and self._params != '':
+      path = path + ';' + self._params
+    if len(self.queries) != 0:
+      path = path + '?' + self.queries.serialize()
     return {
       'method': self.method,
       'path': path,
@@ -780,15 +883,15 @@ class CaptureHttpRequest:
   def toJson(self) -> str:
     return json.dumps(self.serialize())
 
-class CaptureHttpResponse:
+class HttpResponse:
   def __init__(self, json):
-    self._request = CaptureHttpRequest(json['request'])
+    self._request = HttpRequest(json['request'])
     self._code = json['code']
     self._message = json['message']
     self._protocol = json['protocol']
-    self._headers = CaptureHttpHeaders(json.get('headers'))
-    self._body = CaptureHttpBody.parse(json.get('body'))
-    self._trailers = CaptureHttpHeaders(json.get('trailers'))
+    self._headers = HttpHeaders(json.get('headers'))
+    self._body = HttpBody.parse(json.get('body'))
+    self._trailers = HttpHeaders(json.get('trailers'))
 
   def __str__(self):
     return self.toJson()
@@ -801,7 +904,7 @@ class CaptureHttpResponse:
 
   # Get the request informations.
   @property
-  def request(self) -> CaptureHttpRequest:
+  def request(self) -> HttpRequest:
     return self._request
 
   # Get the response status code.
@@ -829,33 +932,33 @@ class CaptureHttpResponse:
 
   # Get the response headers.
   @property
-  def headers(self) -> CaptureHttpHeaders:
+  def headers(self) -> HttpHeaders:
     return self._headers
 
   # Set the response headers.
   @headers.setter
   def headers(self, data: Union[List[str], List[Tuple[str, str]], Dict[str, str]]):
-    self._headers = CaptureHttpHeaders.of(data)
+    self._headers = HttpHeaders.of(data)
 
   # Set the response trailers. Note that the implementation of this function is incomplete, please do not use it.
   @property
-  def trailers(self) -> CaptureHttpHeaders:
+  def trailers(self) -> HttpHeaders:
     return self._trailers
 
   # Get the response trailers. Note that the implementation of this function is incomplete, please do not use it.
   @trailers.setter
   def trailers(self, data: Union[List[str], List[Tuple[str, str]], Dict[str, str]]):
-    self._trailers = CaptureHttpHeaders.of(data)
+    self._trailers = HttpHeaders.of(data)
 
   # Get the response body.
   @property
-  def body(self) -> CaptureHttpBody:
+  def body(self) -> HttpBody:
     return self._body
 
   # Set the response body.
   @body.setter
-  def body(self, data: Union[str, bytes, dict, CaptureHttpBody]):
-    self._body = CaptureHttpBody.of(data)
+  def body(self, data: Union[str, bytes, dict, HttpBody]):
+    self._body = HttpBody.of(data)
 
   # Get the response content type from headers.
   @property
@@ -886,3 +989,15 @@ class CaptureHttpResponse:
 
   def toJson(self) -> str:
     return json.dumps(self.serialize())
+
+####################################################################################################
+# Below is the legacy classes, they are deprecated and will be removed in the future.
+####################################################################################################
+CaptureApp = App
+CaptureContext = Context
+CaptureHttpQueries = HttpQueries
+CaptureHttpHeaders = HttpHeaders
+CaptureHttpBody = HttpBody
+CaptureHttpMultipartBody = HttpMultipartBody
+CaptureHttpRequest = HttpRequest
+CaptureHttpResponse = HttpResponse

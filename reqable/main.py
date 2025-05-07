@@ -1,4 +1,10 @@
 import sys
+import os
+
+pwd = os.path.dirname(os.path.abspath(__file__))
+if pwd not in sys.path:
+  sys.path.append(pwd)
+
 import json
 from reqable import CaptureContext, CaptureHttpRequest, CaptureHttpResponse
 import addons
@@ -25,6 +31,8 @@ def onRequest(request):
         callback.write(json.dumps({
           'request': result.serialize(),
           'env': context.env,
+          'highlight': context.highlight,
+          'comment': context.comment,
           'shared': context.shared,
         }))
 
@@ -38,6 +46,8 @@ def onResponse(response):
         callback.write(json.dumps({
           'response': result.serialize(),
           'env': context.env,
+          'highlight': context.highlight,
+          'comment': context.comment,
           'shared': context.shared,
         }))
 
