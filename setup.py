@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
 	name="reqable-scripting",
-	version="1.1.0",
+	version="1.2.0",
 	author="MegatronKing",
 	author_email="coding@reqable.com",
 	url="https://reqable.com/docs/capture/addons",
