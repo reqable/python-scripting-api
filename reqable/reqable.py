@@ -854,6 +854,11 @@ class HttpRequest:
   def contentType(self) -> Union[str, None]:
     return self._headers['content-type']
 
+  # Set the request content type to headers.
+  @contentType.setter
+  def contentType(self, value: str):
+    self._headers['content-type'] = value
+
   # Get the request mime type from headers.
   @property
   def mime(self) -> Union[str, None]:
@@ -964,6 +969,11 @@ class HttpResponse:
   @property
   def contentType(self) -> Union[str, None]:
     return self._headers['content-type']
+
+  # Set the response content type to headers.
+  @contentType.setter
+  def contentType(self, value: str):
+    self._headers['content-type'] = value
 
   # Get the response mime type from headers.
   @property
