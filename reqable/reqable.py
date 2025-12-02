@@ -290,7 +290,7 @@ class HttpQueries:
     return json.dumps(self.toDict())
 
   def serialize(self) -> str:
-    return self.origin if self.mod == 0 else self.concat()
+    return self.origin if self.mod == 0 and self.origin is not None else self.concat()
 
 class HttpHeaders:
 
