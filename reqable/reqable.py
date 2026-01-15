@@ -5,6 +5,64 @@ from email.message import EmailMessage
 from enum import Enum
 from typing import Union, List, Tuple, Dict
 
+class Address:
+  def __init__(self, json: dict):
+    self._ip = json['ip']
+    self._port = json['port']
+
+  # The IP address.
+  @property
+  def ip(self) -> str:
+    return self._ip
+
+  # The port number.
+  @property
+  def port(self) -> int:
+    return self._port
+
+  # Serialize the address to a dict.
+  def serialize(self) -> dict:
+    return {
+      'ip': self._ip,
+      'port': self._port,
+    }
+
+class Connection:
+  def __init__(self, json: dict):
+    self._id = json['id']
+    self._timestamp = json['timestamp']
+    self._local = Address(json['local'])
+    self._remote = Address(json['remote'])
+
+  # The TCP connection id.
+  @property
+  def id(self) -> int:
+    return self._id
+
+  # The TCP connection establised timestamp.
+  @property
+  def timestamp(self) -> int:
+    return self._timestamp
+
+  # The local(client) address.
+  @property
+  def local(self) -> Address:
+    return self._local
+
+  # The remote(server) address.
+  @property
+  def remote(self) -> Address:
+    return self._remote
+
+  # Serialize the connection info to a dict.
+  def serialize(self) -> dict:
+    return {
+      'id': self._id,
+      'timestamp': self._timestamp,
+      'local': self._local.serialize(),
+      'remote': self._remote.serialize(),
+    }
+
 class App:
   def __init__(self, json: dict):
     self._name = json['name']
@@ -51,17 +109,20 @@ class Context:
     self._scheme = json['scheme']
     self._host = json['host']
     self._port = json['port']
-    self._cid = json['cid']
-    self._ctime = json['ctime']
-    self._sid = json['sid']
-    self._stime = json['stime']
-    self._env = json.get('env')
-    self._comment = json.get('comment')
+    self._id = json['id']
+    self._timestamp = json['timestamp']
+    connection = json['connection']
+    if connection is None:
+      self._connection = None
+    else:
+      self._connection = Connection(connection)
     app = json.get('app')
     if app is None:
       self._app = None
     else:
       self._app = App(app)
+    self._env = json.get('env')
+    self._comment = json.get('comment')
     self._highlight = None
     self.shared = json.get('shared')
 
@@ -94,25 +155,44 @@ class Context:
   def port(self) -> int:
     return self._port
 
-  # TCP connection id.
+  # Deprecated! Use `connection.id` instead.
   @property
-  def cid(self) -> int:
-    return self._cid
+  def cid(self) -> Union[int, None]:
+    if self._connection is None:
+      return None
+    return self._connection.id
 
-  # TCP connection establised timestamp.
+  # Deprecated! Use `connection.timestamp` instead.
   @property
-  def ctime(self) -> int:
-    return self._ctime
+  def ctime(self) -> Union[int, None]:
+    if self._connection is None:
+      return None
+    return self._connection.timestamp
 
-  # HTTP session id.
+  # HTTP request session id.
+  @property
+  def id(self) -> int:
+    return self._id
+
+  # Deprecated! Use `id` instead.
   @property
   def sid(self) -> int:
-    return self._sid
+    return self._id
 
-  # HTTP session timestamp.
+  # HTTP request session timestamp.
+  @property
+  def timestamp(self) -> int:
+    return self._timestamp
+
+  # Deprecated! Use `timestamp` instead.
   @property
   def stime(self) -> int:
-    return self._stime
+    return self._timestamp
+
+  # TCP connection info. In REST API, it always be None.
+  @property
+  def connection(self) -> Union[Connection, None]:
+    return self._connection
 
   # HTTP uniqued id.
   @property
@@ -154,12 +234,11 @@ class Context:
       'scheme': self._scheme,
       'host': self._host,
       'port': self._port,
-      'cid': self._cid,
-      'ctime': self._ctime,
-      'sid': self._sid,
-      'stime': self._stime,
+      'id': self._id,
+      'timestamp': self._timestamp,
       'env': self._env,
-      'app': self._app.serialize(),
+      'connection': None if self._connection is None else self._connection.serialize(),
+      'app': None if self._app is None else self._app.serialize(),
       'shared': self.shared,
       'highlight': self._highlight,
       'comment': self._comment,
